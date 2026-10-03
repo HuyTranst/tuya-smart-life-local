@@ -65,7 +65,7 @@ có thiết bị/hub nằm trên cùng miền phát sóng với Home Assistant.
 3. Mở menu **...** ở góc trên bên phải và chọn
 **Kho lưu trữ tùy chỉnh**.
 4. Nhập URL kho lưu trữ này:
-https://github.com/home-assistant-tools/tuya-smart-life
+https://github.com/HuyTranst/tuya-smart-life-local
 5. Chọn **Tích hợp** làm danh mục/loại.
 6. Nhấp vào **Thêm**.
 7. Tìm **Tuya Smart Life Local** trong HACS và nhấp vào **Tải xuống**.
