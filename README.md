@@ -1,306 +1,79 @@
 # Tuya Smart Life Local
+Tích hợp Home Assistant tùy chỉnh để đăng nhập bằng tài khoản email/điện thoại Smart Life hoặc Tuya Smart thông thường,
+lấy thông tin nhà/thiết bị từ API di động và
+điều khiển trực tiếp các thiết bị được hỗ trợ trên mạng LAN cục bộ bằng khóa cục bộ của chúng.
+Tích hợp này không yêu cầu dự án Tuya IoT Cloud. Bạn không cần
+nhập `app_id`, `app_secret`, dấu vân tay chứng chỉ hoặc khóa ký gốc.
+## Tính năng
+- Đăng nhập bằng địa chỉ email hoặc số điện thoại Smart Life/Tuya Smart và
+mật khẩu.
+- Chọn một hoặc nhiều nhà để đồng bộ hóa. Bạn có thể để trống lựa chọn để tránh
+tải thiết bị vào lúc này.
+- Lấy thông tin thiết bị, khóa cục bộ, cấu trúc liên kết hub/con, MAC/UUID và dữ liệu DPS ban đầu
+từ API di động của Tuya.
+- Điều khiển thiết bị cục bộ thông qua TinyTuya trên mạng LAN, mà không cần sử dụng đám mây
+các cuộc gọi OpenAPI cho các thao tác bật/tắt.
+- Duy trì kết nối TCP cục bộ liên tục với các thiết bị/hub để cập nhật DPS theo thời gian thực.
+Luồng dữ liệu tự động bắt đầu khi quá trình phát sóng/quét UDP phát hiện ra địa chỉ IP mạng LAN.
+Sau đó, làm mới/đồng bộ hóa một lần và lắng nghe các bản cập nhật đẩy. Các lệnh cũng
+ưu tiên cùng một socket luồng để tránh việc thiết bị từ chối kết nối mạng LAN thứ hai; quá trình tích hợp không định kỳ thăm dò trạng thái cục bộ.
+- Lắng nghe các bản phát sóng UDP của Tuya và chạy quét mạng LAN để giữ cho dữ liệu phiên bản IP/giao thức luôn được cập nhật khi thiết bị hoặc hub thay đổi chi tiết mạng.
+- Bỏ qua các địa chỉ IP công cộng/WAN được trả về bởi API di động và chỉ sử dụng các địa chỉ IP mạng LAN riêng tư cho các lệnh cục bộ.
+- Tạo các thực thể chuyển mạch cho các giá trị DPS của nút/công tắc từ `dataPointInfo.dps`.
+Nếu `dataPointInfo.dpName` chứa nhãn, các nhãn đó sẽ được sử dụng; nếu không,
+các thực thể sẽ sử dụng tên như `Button <dp_id>`.
+- Tạo các cảm biến nhị phân cho cảm biến tiếp xúc/cửa Tuya (`mcs`), cảm biến PIR/chuyển động
+và cảm biến hiện diện/chiếm dụng (`hps`) bằng cách sử dụng các bản cập nhật DPS cục bộ theo thời gian thực
+từ thiết bị hoặc hub chính. - Tạo một cảm biến văn bản cho các nút ngữ cảnh/cảnh Tuya (`wxkg`). Cảm biến
+trạng thái là hành động cuối cùng ở dạng `<nút>_<hành động>`, ví dụ: `1_nhấn`,
+`1_nhấn đúp`, `1_giữ` hoặc `2_nhấn đúp`.
+- Tạo các thực thể quạt cho các thiết bị quạt được nhận dạng, ví dụ: các thiết bị có
+giá trị DPS công suất và tốc độ riêng biệt, và cho các điều khiển từ xa quạt hồng ngoại được hỗ trợ.
+- Tạo một cảm biến nhị phân `Trực tuyến` chẩn đoán cho các hub để các hub vẫn xuất hiện trong
+Home Assistant ngay cả khi chúng không hiển thị các nút điều khiển trực tiếp.
+- Tạo các thực thể nút cho điều khiển từ xa hồng ngoại khi API di động Tuya trả về các tải trọng DPS hành động điều khiển từ xa ảo có thể sử dụng được,
+bao gồm các phím dự phòng cho điều khiển từ xa DIY và đa phương tiện.
+- Phát hiện điều khiển từ xa hồng ngoại cho điều hòa/khí hậu, quạt, đèn, TV/đầu thu kỹ thuật số, âm thanh, máy chiếu và DVD từ API hồng ngoại của Tuya. Các lệnh về khí hậu, quạt, đèn và trình phát đa phương tiện được gửi cục bộ thông qua hub hồng ngoại; Trạng thái được hiển thị lạc quan vì các thiết bị IR
+không báo cáo lại trạng thái thực của chúng.
+- Dọn dẹp các thực thể/thiết bị lỗi thời khi bạn thay đổi danh sách nhà đã chọn.
+## Yêu cầu
+- Home Assistant đã cài đặt HACS.
+- Home Assistant phải nằm trên cùng mạng LAN/miền phát sóng với các thiết bị Tuya
+hoặc hub mà bạn muốn điều khiển cục bộ. Việc tích hợp cần các gói phát sóng UDP của Tuya
+để phát hiện thông tin IP/giao thức mạng LAN và mở các luồng TCP thời gian thực.
+- Một tài khoản Smart Life/Tuya Smart sở hữu các thiết bị.
 
-Custom Home Assistant integration for logging in with a normal Smart Life or
-Tuya Smart email/phone account, fetching homes/devices from the mobile API, and
-controlling supported devices directly on the local LAN with their local keys.
+- Các thiết bị phải có khóa cục bộ trong API di động và phải hỗ trợ giao thức cục bộ của Tuya
+- Đối với điều khiển từ xa IR, hub IR thực phải nằm trên cùng mạng LAN với Home Assistant.
+Các điều khiển từ xa ảo như điều khiển TV, điều hòa hoặc quạt IR là các thiết bị phía ứng dụng nằm sau hub,
+và các lệnh cuối cùng được gửi qua hub.
+Lưu ý quan trọng về mạng: nếu nhà Smart Life nằm trên mạng LAN/mạng con/VLAN khác,
+Home Assistant chưa thể tự động kết nối với các thiết bị đó cục bộ.
 
-This integration does not require a Tuya IoT Cloud project. You do not need to
-enter an `app_id`, `app_secret`, certificate fingerprint, or native signing key.
+Tính năng phát hiện xuyên mạng không được hỗ trợ vì cơ chế phát sóng/phát hiện UDP của Tuya
+không hoạt động xuyên qua các bộ định tuyến theo mặc định. Việc có thể ping hoặc định tuyến TCP đến một thiết bị
+là không đủ cho cơ chế phát hiện tự động hiện tại. Một số
+giải pháp thay thế hoặc tích hợp khác có thể cho phép bạn tạm thời trỏ đến một địa chỉ IP thủ công, nhưng
+điều đó không được khuyến nghị: khi thiết bị thay đổi địa chỉ IP hoặc phiên bản giao thức,
+Home Assistant sẽ không nhận được bản tin phát sóng UDP cần thiết để cập nhật và
 
-## Features
-
-- Log in with your Smart Life/Tuya Smart email address or phone number and
-  password.
-- Select one or more homes to sync. You can leave the selection empty to avoid
-  loading devices for now.
-- Fetch devices, local keys, hub/child topology, MAC/UUID, and initial DPS data
-  from the Tuya mobile API.
-- Control devices locally through TinyTuya over the LAN, without using cloud
-  OpenAPI calls for on/off actions.
-- Keep persistent local TCP connections to devices/hubs for realtime DPS
-  updates. Streams start automatically when UDP broadcast/scan discovers the
-  LAN IP, then refresh/sync once and listen for push updates. Commands also
-  prefer the same stream socket to avoid devices rejecting a second LAN
-  connection; the integration does not poll local state periodically.
-- Listen for Tuya UDP broadcasts and run LAN scans to keep IP/protocol version
-  data current when devices or hubs change network details.
-- Ignore public/WAN IPs returned by the mobile API and use only private LAN IPs
-  for local commands.
-- Create switch entities for button/gang DPS values from `dataPointInfo.dps`.
-  If `dataPointInfo.dpName` contains labels, those labels are used; otherwise
-  entities fall back to names such as `Button <dp_id>`.
-- Create binary sensors for Tuya contact/door sensors (`mcs`), PIR/motion
-  sensors, and presence/occupancy sensors (`hps`) using realtime local DPS
-  updates from the device or parent hub.
-- Create one text sensor for Tuya context/scene buttons (`wxkg`). The sensor
-  state is the last action in `<button>_<action>` form, for example `1_press`,
-  `1_double`, `1_long`, or `2_double`.
-- Create fan entities for recognized fan devices, for example devices with
-  separate power and speed DPS values, and for supported IR fan remotes.
-- Create a diagnostic `Online` binary sensor for hubs so hubs still appear in
-  Home Assistant even when they do not expose direct control buttons.
-- Create button entities for IR remotes when the Tuya mobile API returns usable
-  virtual remote action DPS payloads, including fallback keys for DIY and media
-  remotes.
-- Detect IR AC/climate, fan, light, TV/set-top box, audio, projector, and DVD
-  remotes from Tuya's infrared APIs. Climate, fan, light, and media_player
-  commands are sent locally through the IR hub; state is optimistic because IR
-  appliances do not report their real state back.
-- Clean up stale entities/devices when you change the selected home list.
-
-## Requirements
-
-- Home Assistant with HACS installed.
-- Home Assistant must be on the same LAN/broadcast domain as the Tuya devices
-  or hubs you want to control locally. The integration needs Tuya UDP broadcast
-  packets to discover LAN IP/protocol information and open realtime TCP streams.
-- A Smart Life/Tuya Smart account that owns the devices.
-- Devices must have local keys in the mobile API and must support the Tuya local
-  protocol.
-- For IR remotes, the real IR hub must be on the same LAN as Home Assistant.
-  Virtual remotes such as TV, AC, or IR fan remotes are app-side devices behind
-  the hub, and commands are ultimately sent through the hub.
-
-Important network note: if a Smart Life home is on another LAN/subnet/VLAN,
-Home Assistant cannot automatically connect to those devices locally yet.
-Cross-network discovery is not supported because Tuya UDP broadcast/discovery
-does not cross routers by default. Being able to ping or route TCP to a device
-is not enough for the current automatic discovery mechanism. Some other
-workarounds or integrations may let you point to a manual IP temporarily, but
-that is not recommended: when the device changes IP or protocol version,
-Home Assistant will not receive the UDP broadcast needed to update itself and
-local realtime/control can break. The stable setup is to select only homes
-whose devices/hubs are on the same broadcast domain as Home Assistant.
-
-## HACS Installation
-
-1. Open HACS in Home Assistant.
-2. Go to **Integrations**.
-3. Open the **...** menu in the top-right corner and choose
-   **Custom repositories**.
-4. Enter this repository URL:
-
-   ```text
-   https://github.com/home-assistant-tools/tuya-smart-life
-   ```
-
-5. Select **Integration** as the category/type.
-6. Click **Add**.
-7. Find **Tuya Smart Life Local** in HACS and click **Download**.
-8. Restart Home Assistant.
-
-## Integration Setup
-
-1. Go to **Settings -> Devices & services**.
-2. Click **Add integration**.
-3. Search for **Tuya Smart Life Local**.
-4. Enter your Smart Life/Tuya Smart email address or phone number and password.
-   Keep **API region** on **Auto** unless login fails for your account region.
-5. After login succeeds, select the homes you want to sync, or leave the list
-   empty if you do not want to load any devices yet.
-6. Submit the flow and wait for Home Assistant to create devices/entities.
-
-For phone-number login, the default country code is `84`. Change it to your
-phone country code if your account is outside Vietnam. The integration
-recognizes numbers formatted as `+<country code>...` or
-`00<country code>...`. For phone numbers entered with a leading `0`, it also
-tries the variant without the leading `0` because the mobile API expects the
-country code separately.
-
-The **API region** setting selects the Tuya mobile API endpoint, not a Tuya IoT
-Cloud project region. `Auto` currently tries the known Smart Life/Tuya Smart
-mobile endpoints for US, Singapore, EU, China, and India, then follows the
-domain/region information returned by Tuya after login when available.
-
-After changing the selected home list in integration options, the integration
-reloads so Home Assistant can clean up and recreate the correct registry
-entries. If you are upgrading from a version older than `0.1.37`, reload or
-restart Home Assistant after updating.
-
-If Tuya returns a stale mobile API domain after login, the integration retries
-the same request against the known Smart Life/Tuya Smart mobile endpoints
-instead of failing setup on an HTTP `404` from `/api.json`.
-
-IR key data from Tuya's keydata API is normalized to the same `key1` pulse
-format used by the Tuya app panel before publishing DP `201` to the hub.
-
-## How Local Control Works
-
-The mobile/cloud API is used only for metadata:
-
-- login
-- home list
-- device list
-- local keys
-- hub/child relationships
-- initial DPS values
-- IR remote action metadata
-
-When you turn a switch on or off in Home Assistant, the command path is local:
-
-```text
-Home Assistant -> device/hub LAN IP -> TinyTuya -> Tuya local protocol
-```
-
-For child devices behind a hub, commands are sent through the parent hub using
-`parentDevId` and `node_id`/`cid` when Tuya returns complete topology metadata.
-
-For Zigbee/BLE devices behind hubs, the integration also reads hub UDP
-broadcasts to update the protocol version for each child when the broadcast
-contains `cid`/`nodeId`. This helps avoid local errors such as
-`Check device key or version` when a child uses a different protocol version
-from its hub.
-
-For IR remotes, the integration reads action data from the Tuya app
-scene/action APIs and sends raw DPS directly to the IR hub on the LAN. It does
-not use a Tuya IoT Cloud project and does not call cloud OpenAPI to press
-remote buttons.
-
-## Switch Buttons And DPS
-
-Tuya describes switch buttons/gangs through DPS metadata:
-
-- `dataPointInfo.dps`: current value for each DP.
-- `dataPointInfo.dpName`: optional label for each DP.
-
-The integration exposes boolean DPS values that look like controllable
-buttons/gangs. Auxiliary fields such as indicator, backlight, countdown, or
-secondary status values are skipped when they can be recognized. Devices without
-`dpName` labels use fallback entity names such as `Button 1`, `Button 2`.
-
-Some devices use boolean DP `1` as the power control for another domain, such
-as a fan. When a device is recognized as a fan, that power DP is exposed as a
-`fan` entity instead of a `switch`; auxiliary boolean DPS values such as a fan
-light can still be exposed as separate switches when Tuya returns them.
-
-## Sensors And Context Buttons
-
-The integration maps Tuya's common sensor categories in the same direction as
-tuya2matter:
-
-- `mcs`: contact/door binary sensor. Tuya's `doorcontact_state` is inverted so
-  Home Assistant is `on` when the door/window is open.
-- `hps`: occupancy/presence binary sensor.
-- PIR/motion devices: motion binary sensor when DPS/category/name metadata
-  identifies motion.
-- `wxkg`: one text sensor named `Action`. Its state is the last recognized
-  button action. Tuya values `single_click`, `double_click`, and `long_press`
-  are normalized to `press`, `double`, and `long`, so four-button devices can
-  report states such as `1_press`, `1_double`, `1_long`, `2_press`, and
-  `2_double`.
-
-## IR Devices
-
-Tuya manages IR devices in two layers:
-
-- Real IR hub: has the local key, LAN IP, and receives local commands.
-- Virtual IR remote: TV, AC, fan, and similar remotes behind the IR hub. These
-  have a `remote_id`.
-
-The integration calls `tuya.m.infrared.gateway.get` and
-`tuya.m.infrared.keydata.get` to fetch virtual IR remotes and their key data,
-then builds local hub DP `201` payloads from the same data used by the Tuya app
-IR panel. It also calls `thing.m.linkage.dev.list` and
-`thing.m.linkage.function.list` to fetch remotes/actions used by the Tuya app
-automation editor, and tries scene-rule APIs such as
-`thing.m.linkage.rule.query` and `thing.m.linkage.rule.detail.find` to import
-IR payloads saved by the app in scenes. If an action contains valid raw DPS,
-Home Assistant creates a matching button and publishes that raw DPS directly to
-the local IR hub. The virtual remote `remote_id` is used only for naming,
-entity identity, and report metadata; it is not packaged as a local `cid` in
-the frame sent to the hub.
-
-Recognized IR remotes are mapped to Home Assistant platforms:
-
-- AC/air conditioner: `climate`.
-- Fan: `fan`.
-- TV, set-top box, TV box, audio, projector, DVD: `media_player` plus raw key
-  buttons for commands that do not fit Home Assistant's media model.
-- Light: `light`.
-- DIY/unknown: `button` fallback.
-
-IR control is one-way, so Home Assistant state represents the last command
-sent, not a state read back from the appliance.
-
-To debug IR data outside Home Assistant:
-
-```bash
-python3 tools/tuya_mobile_login.py --action ir --home-id <home-id>
-python3 tools/tuya_mobile_login.py --action ir --home-id <home-id> --json
-```
-
-The script redacts session/key/token values by default and prints only the
-remote, category, hub, function, and discovered `actionDps` payloads.
-
-## Updating
-
-HACS detects GitHub releases from this repository. To update:
-
-1. Open HACS.
-2. Open the **Tuya Smart Life Local** repository page.
-3. Click **Update information** if the new version is not visible yet.
-4. Click **Download/Redownload** for the new version.
-5. Restart Home Assistant.
-
-## Troubleshooting
-
-### Login Shows `cannot_connect`
-
-- Check the email/phone number/password.
-- Check Home Assistant internet access.
-- If the account was created in another Smart Life/Tuya Smart region, leave
-  **API region** on **Auto** or try the matching region manually.
-- If Smart Life requires MFA or another secondary verification flow, the login
-  script may not handle that flow yet.
-
-### Entity Is Unavailable Or Local Control Fails
-
-- Check that Home Assistant and the device/hub are on the same LAN/broadcast
-  domain.
-- If Home Assistant runs in Docker/TrueNAS, use a network mode that can receive
-  LAN broadcasts. The integration needs to listen on UDP `6666`, `6667`, `6699`,
-  and `7000`, and it needs TCP access to the local device/hub.
-- Cross-subnet/VLAN/WAN discovery is not supported automatically. Tuya UDP
-  broadcast does not cross routers, so Home Assistant may be able to ping/TCP
-  the device IP while still being unable to learn IP/protocol changes for
-  stable realtime local control.
-- If you use another approach to point to a manual IP for a device on another
-  LAN, treat it as a temporary workaround. When the device IP/version changes,
-  Home Assistant will not receive broadcast updates and the entity may become
-  unavailable or local control may fail.
-- If the mobile API returns a public/WAN IP, the integration ignores it and
-  waits for broadcast or LAN scan to find a private IP.
-- Some devices may return mismatched local key/protocol data. TinyTuya reports
-  this as errors such as `Check device key or version`. The integration
-  prioritizes the version learned from UDP broadcast and tries protocol
-  fallbacks for child devices behind hubs.
-
-### IR Remote Or IR Climate Does Not Appear
-
-- Check that the selected home has an IR hub on the same LAN as Home Assistant.
-- Run `tools/tuya_mobile_login.py --action ir --home-id <home-id>` to see
-  whether the mobile API returns remote/action data.
-- If Tuya returns only raw standalone buttons, the integration creates button
-  entities instead of a higher-level climate/fan/light/media_player entity.
-- If neither API nor scenes return `actionDps`/`executorProperty`, the current
-  data is not enough to press the local IR action. In that case, creating a
-  scene in the Tuya app for the needed IR button may help the app store the
-  corresponding payload.
-
-### Wrong Home Selected
-
-Open the integration options and remove that home from the selected home list.
-You can select no homes if you want the integration to keep only login/home-list
-data without loading devices. The integration cleans stale entities/devices
-after reload/restart.
-
-## Technical Notes
-
-This README is for installation and day-to-day use. Reverse engineering, MITM,
-mobile API, signing, and crypto notes live in separate technical documents:
-
-- [Reverse engineering and MITM notes](docs/reverse-engineering.md)
-- [Tuya Smart Android API findings](docs/tuya-smart-android-api-findings.md)
-
-APKs and decompiled source are not committed to this repository. Only notes,
-tooling, and the Home Assistant integration are kept here.
+việc điều khiển/thời gian thực cục bộ có thể bị gián đoạn. Cấu hình ổn định là chỉ chọn những ngôi nhà
+có thiết bị/hub nằm trên cùng miền phát sóng với Home Assistant.
+## Cài đặt HACS
+1. Mở HACS trong Home Assistant.
+2. Vào **Tích hợp**.
+3. Mở menu **...** ở góc trên bên phải và chọn
+**Kho lưu trữ tùy chỉnh**.
+4. Nhập URL kho lưu trữ này:
+https://github.com/home-assistant-tools/tuya-smart-life
+5. Chọn **Tích hợp** làm danh mục/loại.
+6. Nhấp vào **Thêm**.
+7. Tìm **Tuya Smart Life Local** trong HACS và nhấp vào **Tải xuống**.
+8. Khởi động lại Home Assistant.
+## Thiết lập tích hợp
+1. Vào **Cài đặt -> Thiết bị & dịch vụ**.
+2. Nhấp vào **Thêm tích hợp**.
+3. Tìm kiếm **Tuya Smart Life Local**.
+4. Nhập địa chỉ email hoặc số điện thoại Smart Life/Tuya Smart và mật khẩu của bạn.
+Giữ **Vùng API** ở chế độ **Tự động** trừ khi đăng nhập
+Gửi ý kiến phản hồi
